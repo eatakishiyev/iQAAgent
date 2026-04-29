@@ -87,7 +87,7 @@ activate_package
   returns: success (boolean), package_id, valid_until (ISO datetime)
 
 ## AVAILABLE WAIT EVENTS
-call_finished | sms_delivered | topup_complete | manual
+call_finished | sms_delivered | topup_complete | manual | call_answered
 
 ## VARIABLE REFERENCES
 Use ${variable_name} inside param string values to reference earlier results.

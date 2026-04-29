@@ -14,7 +14,7 @@ def make_call(caller_number: str, callee_number: str, duration_seconds: int) -> 
 def get_balance(msisdn: str) -> dict:
     """Query subscriber balance from billing system."""
     # return telco_engine.check_balance(msisdn)
-    return {"balance": 7.50, "currency": "AZN", "package_active": False}
+    return {"balance": 67.50, "currency": "AZN", "package_active": False}
 
 @tool
 def topup_balance(msisdn: str, amount_azn: float) -> dict:

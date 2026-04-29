@@ -50,7 +50,7 @@ def generate_flow(user_prompt: str, max_retries: int = 3) -> dict:
             },
         )
         raw = resp.choices[0].message.content.strip()
-
+        print(f"  [GENERATOR] Flow details:\n{raw}")
         # Strip accidental markdown fences
         if "```" in raw:
             raw = raw.split("```")[1]
@@ -112,10 +112,16 @@ def start_test(flow: dict, checkpointer) -> dict:
 
 def resume_test(flow: dict, checkpointer, event_payload: dict) -> dict:
     graph  = build_graph(flow, checkpointer)
+
     config = {"configurable": {"thread_id": flow["flow_id"]}}
 
-    print(f"\n[EXECUTOR] Resuming: {flow['flow_id']} with {event_payload}")
-    return graph.invoke(Command(resume=event_payload), config=config)
+    state = graph.get_state(config)
+    for interrupt in state.interrupts:
+        if interrupt.value["waiting_for"] == event_payload["event"]:
+            print(f"\n[EXECUTOR] Resuming: {flow['flow_id']} with {event_payload}")
+            return graph.invoke(Command(resume=event_payload), config=config)
+    print(f"[RESUME] Received event is not eligible to proceed next: {flow['flow_id']} with {event_payload}]")
+    return state
 
 
 def run_test_from_prompt(
@@ -142,20 +148,31 @@ checkpointer = MemorySaver()
 # ── One-liner from prompt ──────────────────────────────────────────────
 result = run_test_from_prompt(
     user_prompt="""
-    Test prepaid voice deduction for subscriber 994702011342:
-    - Call 994501021231 for 45 seconds
-    - After call ends, check balance
-    - If balance < 10 AZN, top up by 20 AZN
-    - Make a second 60-second call to verify
-    - Fail if any call is not charged
+                      - Make call from 994702011342 to 994501021231 with duration 45 seconds;
+                      - When subscriber answered send SMS to 994776011342 with text "+Roaming";
+                      - If balance is less than 10 AZN then topup 20 AZN.;
+                      - If balance updated continue call else finish testing;
+                      - Then make call from 994702011342 to 994501021231 with duration 60 seconds;
+                      - Wait for call to end;
+                      - Send SMS to 994776011342 from 994702011342 with text "+Roaming";
     """,
     checkpointer=checkpointer,
 )
 
 # ── Resume when telco engine fires call_finished ───────────────────────
-sleep(60)
+sleep(20)
 resume_test(
     flow          = result["flow"],
     checkpointer  = checkpointer,
-    event_payload = {"call_id": "c_abc123", "charged": True, "actual_duration": 45},
+    event_payload = {"event":"call_answered","call_id": "c_abc123", "charged": True, "actual_duration": 45},
 )
+
+
+sleep(10)
+result = resume_test(
+    flow          = result["flow"],
+    checkpointer  = checkpointer,
+    event_payload = {"event":"call_finisheds","call_id": "c_mock_001", "charged": True, "actual_duration": 45},
+)
+
+print(result)
